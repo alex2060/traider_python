@@ -16,75 +16,12 @@ import string
 import requests
 #import time
 import hashlib
+import json
+#cconnection
 def try_to_connect():
     cnx = pymysql.connect(user='root', password='secret',host='mysql-server',database='app1')
     return cnx
-
-
-
-def log_traid(traid_id,cnx):
-	sql=("SELECT `traid_mony_type`,`traid_request_type`,`traid_request_amount`,`traid_money_amount`,`buyer`,`user` FROM `traidtable` WHERE `traid_id` LIKE \'"+traid_id+"\';")
-	cursor = cnx.cursor()
-	cursor.execute(sql)
-	traid_mony_type=""
-	for row in cursor:
-		traid_mony_type=row[0]
-		traid_request_type=row[1]
-		traid_request_amount=row[2]
-		traid_money_amount=row[3]
-	if traid_mony_type=="":
-		return "NOT traid_id"
-
-	reciveto_convert_amount=(traid_money_amount/traid_request_amount+get_convertion(traid_mony_type+"_"+traid_request_type,cnx) )/2
-	otherway=(traid_request_amount/traid_money_amount+get_convertion(traid_mony_type+"_"+traid_request_type,cnx) )/2
-
-	sql=("UPDATE `conert` SET `amount` = \'"+str(reciveto_convert_amount)+"\' WHERE `conert`.`to_from` = \'"+traid_mony_type+"_"+traid_request_type+"\';")
-	print(sql)
-	cursor = cnx.cursor(buffered=True)
-	cursor.execute(sql)
-	cnx.commit()
-
-	sql=("UPDATE `conert` SET `amount` = \'"+str(otherway)+"\' WHERE `conert`.`to_from` = \'"+traid_request_type+"_"+traid_mony_type+"\';")
-	print(sql)
-	cursor = cnx.cursor(buffered=True)
-	cursor.execute(sql)
-	cnx.commit()
-
-	cnx.close()
-	return str(reciveto_convert_amount)+" "+str(otherway)
-
-def makeuseremail(uname,email,password,cnx):
-	if uname=="NULL":
-		return "False_NO_NULL_user"
-
-	Q1=("SELECT * FROM `job_usertable` WHERE `username` LIKE \'"+uname+"\';")
-	cursor = cnx.cursor()
-	cursor.execute(Q1)
-	counter=0
-	for row in cursor:
-		counter=counter+1
-	if counter!=0:
-		return "user taken"
-	query = ("INSERT INTO `job_usertable` (`username`, `password`, `creation`, `email`) VALUES (\'"+uname+"\', \'"+password+"\', CURRENT_TIMESTAMP, \'"+email+"\');")
-	#print(query)
-	cursor = cnx.cursor()
-	cursor.execute(query)
-	cnx.commit()
-	
-	query2=("INSERT INTO `money` (`user`, `user_money`, `mony_type`, `amount_of_money`) VALUES (\'"+uname+"\', \'"+uname+"_money1\', 'money1', '1000');")
-	cursor = cnx.cursor()
-	cursor.execute(query2)
-	cnx.commit()
-
-	query3=("INSERT INTO `money` (`user`, `user_money`, `mony_type`, `amount_of_money`) VALUES (\'"+uname+"\', \'"+uname+"_money2\', 'money2', '1000');")
-	cursor = cnx.cursor()
-	cursor.execute(query3)
-	cnx.commit()
-	cnx.close()
-
-	return "added user"
-
-
+#makes randome string
 def get_random_string(length):
     letters = string.ascii_lowercase
     result_str=""
@@ -92,6 +29,8 @@ def get_random_string(length):
     	result_str=result_str+random.choice(letters)
     return result_str
 
+
+#checks user cerdentals 
 def usercheck_conect(uname,password,cnx):
 	if uname=="NULL":
 		return "False"
@@ -106,59 +45,106 @@ def usercheck_conect(uname,password,cnx):
 	return "False"
 
 
+#makes user and initalizes there money
+#http://localhost:8000/doit?user=u1&action_type=add_post&user=u1&password=top&text=mytest&body=mybody&photo=myphoto&catagoy=cat1&catagoy_2=
+
+def makeuseremail(uname,email,password,cnx):
+	if uname=="NULL":
+		return "False_NO_NULL_user"
+
+	Q1=("SELECT * FROM `job_usertable` WHERE `username` LIKE \'"+uname+"\';")
+	cursor = cnx.cursor()
+	cursor.execute(Q1)
+	counter=0
+	for row in cursor:
+		counter=counter+1
+	if counter!=0:
+		dictionary ={ 
+		  "response": "user_taken"
+		}
+		return json.dumps(dictionary, indent = 4)
+	query = ("INSERT INTO `job_usertable` (`username`, `password`, `creation`, `email`) VALUES (\'"+uname+"\', \'"+password+"\', CURRENT_TIMESTAMP, \'"+email+"\');")
+	#print(query)
+	cursor = cnx.cursor()
+	cursor.execute(query)
+	cnx.commit()
+	#adds money to user
+	query2=("INSERT INTO `money` (`user`, `user_money`, `mony_type`, `amount_of_money`) VALUES (\'"+uname+"\', \'"+uname+"_money1\', 'money1', '1000');")
+	cursor = cnx.cursor()
+	cursor.execute(query2)
+	cnx.commit()
+	#adds money to user
+	query3=("INSERT INTO `money` (`user`, `user_money`, `mony_type`, `amount_of_money`) VALUES (\'"+uname+"\', \'"+uname+"_money2\', 'money2', '1000');")
+	cursor = cnx.cursor()
+	cursor.execute(query3)
+	cnx.commit()
+	cnx.close()
+	dictionary ={ 
+	  "response": "added_user"
+	}
+	return json.dumps(dictionary, indent = 4)
+
+#finishes traid via traid id
 def funtion_make_traid(username, password ,traid_money_type,traid_money_amount,request_money_type,request_amount ,cnx):
 	if username=="NULL":
-		return "False_NO_NULL_user"
+		dictionary ={ 
+		  "response": "Wrong_Username",
+		  "amnountleft":"NA"
+		} 
+		return json.dumps(dictionary, indent = 4)
 	is_user=usercheck_conect(username,password,cnx)
 	if is_user=="False":
-		return "wrong_username"
+		dictionary ={ 
+		  "response": "Wrong_Username",
+		  "amnountleft":"NA"
+		} 
+		return json.dumps(dictionary, indent = 4)
 	traidid=get_random_string(64)
-
-
 	Q0=("SELECT `amount_of_money` FROM `money` WHERE `user_money` LIKE \'"+username+"_"+traid_money_type+"\'")
-
 	cursor = cnx.cursor()
 	cursor.execute(Q0)
-
 	for row in cursor:
 		money=row[0]
-
 	amnountleft=money-traid_money_amount
 	if amnountleft>0:
-		#print("we good")
-		#print(amnountleft)
 		pass
 	else:
-		return "nofunds"
-
-
+		#case no funds in user acount
+		dictionary ={ 
+		  "response": "No_Funds",
+		  "amnountleft":"NA"
+		} 
+		return json.dumps(dictionary, indent = 4)
+	#event where there are user funds in acount
 	U1=("UPDATE `money` SET `amount_of_money` = \'"+str(amnountleft)+"\' WHERE `money`.`user_money` = '"+username+"_"+traid_money_type+"';")
-
 	cursor = cnx.cursor()
 	cursor.execute(U1)
 	cnx.commit()
-
 	Q1=("INSERT INTO `traidtable` (`traid_id`, `traid_mony_type`, `traid_request_type`, `traid_request_amount`, `traid_money_amount`, `user`, `buyer`) VALUES (\'"+traidid+"\', \'"+traid_money_type+"\', \'"+request_money_type+"\', \'"+str(request_amount)+"\', \'"+str(traid_money_amount)+"\', \'"+username+"\', 'NULL');")
 	cursor = cnx.cursor()
 	cursor.execute(Q1)
 	cnx.commit()
 	counter=0
 	cnx.close()
-	return traidid+" "+str(amnountleft)
+	dictionary ={ 
+	  "response": traidid,
+	  "amnountleft":str(amnountleft)
+	} 
+	return json.dumps(dictionary, indent = 4)
 
-
+#compleats user traid
 def compleat_traid_comand(user,password,traid_id,cnx):
 	if user=="NULL":
 		return "False_NO_NULL_user"
-
 	is_user=usercheck_conect(user,password,cnx)
 	if is_user=="False":
 		return "wrong_username"
-
 	sql=("SELECT `traid_mony_type`,`traid_request_type`,`traid_request_amount`,`traid_money_amount`,`buyer`,`user` FROM `traidtable` WHERE `traid_id` LIKE \'"+traid_id+"\';")
 	cursor = cnx.cursor()
 	cursor.execute(sql)
+	counter=0
 	for row in cursor:
+		counter=1
 		traid_mony_type=row[0]
 		traid_request_type=row[1]
 		traid_request_amount=row[2]
@@ -166,50 +152,51 @@ def compleat_traid_comand(user,password,traid_id,cnx):
 		buyer=row[4]
 		reciver=row[5]
 	#substack form payied user
+	if counter==0:
+		dictionary ={ 
+		  "response": "No_Traid",
+		}
+		return json.dumps(dictionary, indent = 4)
+	#verifies theres enough money user acount
 	Q0=("SELECT `amount_of_money` FROM `money` WHERE `user_money` LIKE \'"+user+"_"+traid_request_type+"\'")
 
 	cursor = cnx.cursor()
 	cursor.execute(Q0)
-
 	for row in cursor:
 		money=row[0]
-
 	amnountleft=money-traid_request_amount
 	if amnountleft>0:
 		pass
 	else:
-		return "nofunds"
-
+		dictionary ={ 
+		  "response": "No_Funds",
+		}
+		return json.dumps(dictionary, indent = 4)
 	U1=("UPDATE `money` SET `amount_of_money` = \'"+str(amnountleft)+"\' WHERE `money`.`user_money` = '"+user+"_"+traid_request_type+"';")
-
 	cursor = cnx.cursor()
 	cursor.execute(U1)
 	cnx.commit()
-
 
 	#put money gained form train to taker of traid
 	Q0=("SELECT `amount_of_money` FROM `money` WHERE `user_money` LIKE \'"+reciver+"_"+traid_request_type+"\'")
 	cursor = cnx.cursor()
 	cursor.execute(Q0)
-
 	for row in cursor:
 		money=row[0]
-
 	amnountleft=money+traid_request_amount
-
-
 	U1=("UPDATE `money` SET `amount_of_money` = \'"+str(amnountleft)+"\' WHERE `money`.`user_money` = '"+reciver+"_"+traid_request_type+"';")
 	cursor = cnx.cursor()
 	cursor.execute(U1)
+
 	#add to user acount who made traid
 	Q0=("SELECT `amount_of_money` FROM `money` WHERE `user_money` LIKE \'"+user+"_"+traid_mony_type+"\'")
-
 	cursor = cnx.cursor()
 	cursor.execute(Q0)
-
 	for row in cursor:
 		money=row[0]
 	amnountleft=money+traid_money_amount
+
+	#add money to user acount
 	U1=("UPDATE `money` SET `amount_of_money` = \'"+str(amnountleft)+"\' WHERE `money`.`user_money` = '"+user+"_"+traid_mony_type+"';")
 	cursor = cnx.cursor()
 	cursor.execute(U1)
@@ -221,17 +208,23 @@ def compleat_traid_comand(user,password,traid_id,cnx):
 	cnx.commit()
 	cnx.close()
 	#print(traid_mony_type,traid_request_type,traid_request_amount,traid_money_amount,buyer,reciver)
+	dictionary ={ 
+	  "response": traid_id,
+	}
+	return json.dumps(dictionary, indent = 4)
 	return traid_id;
 
 
-
+#add barter curancy to acount
 def get_key(path,ledgure_name,keyname,password):
+	#get barter key
 	x = requests.get(path+"check_key.php?name="+keyname)
 
 	getarray = str(x.content)
 
 	out = getarray.split(" ")
 	if len(out)==9:
+	#cehcks barter key
 		print("passed_leddgure")
 	else:
 		return [False,"Failed leddgure",path+" "+ledgure_name+" "+keyname+" "+password+" "+path+"check_key.php?name="+keyname]
@@ -240,6 +233,7 @@ def get_key(path,ledgure_name,keyname,password):
 		print("passed_leddgure")
 	else:
 		return [False,"Failed leddgure",path+" "+ledgure_name+" "+keyname+" "+password+" "+path+"check_key.php?name="+keyname]
+	#
 	passwordCandidate = password
 	val = hashlib.sha256(passwordCandidate.encode()).hexdigest()
 	if val==out[3]:
@@ -247,6 +241,7 @@ def get_key(path,ledgure_name,keyname,password):
 	else:
 		return [False,"Failed_key",path+" "+ledgure_name+" "+keyname+" "+password+" "+path+"check_key.php?name="+keyname]
 	random_string=""
+	#generate and sores new crypto
 	for _ in range(100):
 	    random_integer = random.randint(65, 80)
 	    random_string += (chr(random_integer))
@@ -256,6 +251,7 @@ def get_key(path,ledgure_name,keyname,password):
 	newname = ""
 	x = requests.get(path+"change_key.php?name="+keyname+"&key="+password+"&Nkey="+keyhash)
 	myval = x.content.decode('utf-8').strip()
+
 	if myval=="false":
 		return [False,"NO_key", "",path+" "+ledgure_name+" "+keyname+" "+password+" "+path+"check_key.php?name="+keyname]
 	stingout = path+"output2.php?key="+newkey+"&name="+myval+"&entery_name="+ledgure_name 
@@ -263,7 +259,7 @@ def get_key(path,ledgure_name,keyname,password):
 	return [True,stingout,path+ledgure_name]
 
 
-
+#add crypto to user acount
 def add_crypto(uname,password,path,key,name,lname,cnx):
 	if (usercheck_conect(uname,password,cnx)==False):
 		return "No_user"
@@ -271,7 +267,6 @@ def add_crypto(uname,password,path,key,name,lname,cnx):
 	if is_user=="False":
 		return "wrong_username"
 	val = [False,path+"check_key.php?name="+key,path+"check_key.php?name="+key,""]
-
 	val = get_key(path,lname,name,key)
 	#val = get_key(path,lname,name,key)
 	if (val[0]==True):
@@ -294,7 +289,10 @@ def add_crypto(uname,password,path,key,name,lname,cnx):
 			cursor = cnx.cursor()
 			cursor.execute(query2)
 			cnx.commit()
-			return "1 in acount"
+			dictionary ={ 
+			  "response": "1",
+			}
+			return json.dumps(dictionary, indent = 4)
 		else:
 			Q0=("SELECT `amount_of_money` FROM `money` WHERE `user_money` LIKE \'"+uname+"_"+val[2]+"\'")
 			cursor = cnx.cursor()
@@ -306,11 +304,17 @@ def add_crypto(uname,password,path,key,name,lname,cnx):
 			cursor = cnx.cursor()
 			cursor.execute(U1)
 			cnx.commit()
-			return str(amnountleft)+" in acount"		
+			dictionary ={ 
+			  "response": str(amnountleft),
+			}
+			return json.dumps(dictionary, indent = 4)	
 	else:
-		return "no key "+val[1]+val[2] +path+"check_key.php?name="+name
+		dictionary ={ 
+		  "response": "NO_key",
+		}
+		return json.dumps(dictionary, indent = 4)
 
-
+#adds money type to user acount if its not there and makes it zero 
 def checkandadd_money_type(user,money,cnx):
 	#adds a money collum if there is no money avaible
 	Q0=("SELECT Count(*) FROM `money` WHERE `user_money` LIKE \'"+user+"_"+money+"\' ")
@@ -323,24 +327,28 @@ def checkandadd_money_type(user,money,cnx):
 		cursor = cnx.cursor()
 		cursor.execute(query2)
 		cnx.commit()
+	return
 
 
-
+#returns barter curnacy to user 
 def get_key_back(uname,password,money_type,cnx):
 	if (usercheck_conect(uname,password,cnx)==False):
 		return "No_user"
-
 	checkandadd_money_type(uname,money_type,cnx)
 	Q0=("SELECT `amount_of_money` FROM `money` WHERE `user_money` LIKE \'"+uname+"_"+money_type+"\'")
 	cursor = cnx.cursor()
 	cursor.execute(Q0)
 	for row in cursor:
 		money=row[0]
+	#subtrask curancy
 	amnountleft = money-1
-	if amnountleft>=-0.000000000000001:
+	if amnountleft==0:
 		pass
 	else:
-		return "no_funds for " + uname+"_"+money_type
+		dictionary ={ 
+		  "response": "no_funds for " + uname+"_"+money_type,
+		}
+		return json.dumps(dictionary, indent = 4)
 	U1=("UPDATE `money` SET `amount_of_money` = \'"+str(amnountleft)+"\' WHERE `money`.`user_money` = '"+uname+"_"+money_type+"';")
 	cursor = cnx.cursor()
 	cursor.execute(U1)
@@ -357,7 +365,71 @@ def get_key_back(uname,password,money_type,cnx):
 	cursor = cnx.cursor()
 	cursor.execute(U1)
 	cnx.commit()
-	return url
+	dictionary ={ 
+	  "response": str(url),
+	}
+	return json.dumps(dictionary, indent = 4)
+
+
+
+def get_traid(traid_id,cnx):
+	Q0="SELECT `traid_id`,`traid_mony_type`,`traid_request_type`,`traid_mony_type`,`traid_request_amount`,`traid_money_amount`,`user`,`buyer` FROM `traidtable` WHERE `traid_id` LIKE \'"+traid_id+"\'; "
+	counter=0
+	cursor = cnx.cursor()
+	cursor.execute(Q0)
+	cnx.commit()
+	for row in cursor:
+		counter=1
+		traid_id=row[0]
+		traid_mony_type=row[1]
+		traid_request_type=row[2]
+		traid_request_amount=row[3]
+		traid_money_amount=row[4]
+		traid_request_amount=row[5]
+		user=row[6]
+		buyer =row[7]
+	if counter==1:
+		dictionary ={ 
+		  "traid_id": traid_id,
+		  "traid_mony_type": traid_mony_type,
+		  "traid_request_type":traid_request_type,
+		  "traid_request_amount":traid_request_amount,
+		  "traid_money_amount":traid_money_amount,
+		  "traid_request_amount":traid_request_amount,
+		  "user":user,
+		  "buyer":buyer
+		}
+		return json.dumps(dictionary, indent = 4)
+		#return str(traid_id)+" "+str(traid_mony_type)+" "+str(traid_request_type)+" "+str(traid_request_amount)+" "+str(traid_money_amount)+" "+str(traid_request_amount)+" "+str(user)+" "+str(buyer)
+	dictionary ={ 
+	  "traid_id": "NO_traid_id",
+	  "traid_mony_type": "NA",
+	  "traid_request_type":"NA",
+	  "traid_request_amount":"NA",
+	  "traid_money_amount":"NA",
+	  "traid_request_amount":"NA",
+	  "user":"NA",
+	  "buyer":"NA"
+	}
+	return json.dumps(dictionary, indent = 4)
+
+
+def user_acount(user,cnx):
+	if user=="NULL":
+		return "False_NO_NULL_user"
+	Q0=("SELECT `user_money`,`amount_of_money` FROM `money` WHERE `user` LIKE \'"+user+"\'")
+	cursor = cnx.cursor()
+	cursor.execute(Q0)
+	cnx.commit()
+	outsting=[]
+	for row in cursor:
+		outsting=outsting+[ [row[0],str(row[1])] ]
+	cnx.commit()
+	cnx.close()
+	dictionary ={ 
+	  "out": outsting,
+	}
+	return json.dumps(dictionary, indent = 4)
 
 def traider(req):
     f = open("to_be_frontend_check_make_traid.html", "r")
@@ -365,6 +437,7 @@ def traider(req):
     output= f.read()
     f.close()
     return HttpResponse( output )
+
 def add_C(req):
     f = open("add_C.html", "r")
     output= f.read()
@@ -414,13 +487,11 @@ def doit(req):
         email=req.GET["email"]
     except:
         email=""
-
     phone=""
     try:
         phone=req.GET["phone"]
     except:
         phone=""
-
     password=""
     try:
         password=req.GET["password"]
@@ -436,25 +507,21 @@ def doit(req):
         request_amound=float(req.GET["request_amound"])
     except:
         pass
-
     crypto_name=""
     try:
         crypto_name=req.GET["crypto_name"]
     except:
         pass
-
     crypto_key=""
     try:
         crypto_key=req.GET["crypto_key"]
     except:
         pass
     crypto_path=""
-
     try:
         crypto_path=req.GET["crypto_path"]
     except:
         pass
-
     L_name=""
     try:
         L_name=req.GET["L_name"]
@@ -466,8 +533,6 @@ def doit(req):
         request_type=req.GET["request_type"]
     except:
         pass
-
-
     send_type=""
     try:
         send_type=req.GET["send_type"]
@@ -479,79 +544,27 @@ def doit(req):
     except:
         pass
     mysting=action_type+","+user+","+password+","+traid_id+","+str(request_amound)+","+request_type+","+send_type+","+str(send_amount)
-
+    #http://localhost:8000/doit?action_type=traid&traid_id=ykclfxgbrpwtmuqcjovwkorsdqjzuwooffcmegqqbvdtcoshugqifcifhxettfzu
+    
     if action_type=="adduser":
-        if password!="":
-            pass
-        else:
-            return HttpResponse( "Password Blank" )
-        if user!="":
-            pass
-        else:
-            return HttpResponse( "User Blank" )
-        if email!="":
-            pass
-        else:
-            return HttpResponse( "Email Blank" )
-        if phone!="":
-            pass
-        else:
-            return HttpResponse( "blank4" )
-        out=makeuseremail(user,email,password,try_to_connect())
-        return HttpResponse( out )
-
+        return HttpResponse( makeuseremail(user,email,password,try_to_connect()) )
 
     if action_type=="fintraid":
-        if password!="":
-            pass
-        else:
-            return HttpResponse( "NO_PASSWORD" )
-        if user!="":
-            pass
-        else:
-            return HttpResponse( "NO_USER" )
+        return HttpResponse( compleat_traid_comand(user,password,traid_id,try_to_connect()) )
+    if action_type=="Uprint":
+    	return HttpResponse(  user_acount(user,try_to_connect()) )
 
-        if traid_id =="":
-            return HttpResponse( "NO_Traid_ID" )
-        out=compleat_traid_comand(user,password,traid_id,try_to_connect())
-        try:
-            log_traid(out,try_to_connect())
-        except:
-            pass
-
-        return HttpResponse( out )
+    if action_type=="traid":
+    	return HttpResponse( get_traid(traid_id,try_to_connect()) )
 
     if action_type=="add_C":
-        #x = requests.get("https://www.google.com/")
-        #return HttpResponse(x)
         return HttpResponse(add_crypto(user,password,crypto_path,crypto_key,crypto_name,L_name,try_to_connect()) )
 
-
     if action_type=="get_C":
-        #x = requests.get("https://www.google.com/")
-        #return HttpResponse(x)
         return HttpResponse(get_key_back(user,password,crypto_path+L_name,try_to_connect()))
 
     if action_type=="maketraid":
-        print("in there")
-
-        if password!="":
-            pass
-        else:
-            return HttpResponse( "password blank" )
-        if user!="":
-            pass
-        else:
-            return HttpResponse( "user blank" )
-        if send_type==request_type:
-            return HttpResponse( "send_type==request_type" )
-
-        if request_amound=="":
-            return HttpResponse( "Request_amound Invaild" )
-        if send_amount=="":
-            return HttpResponse( "Send_amount Invaild" )
-        out=funtion_make_traid(user,password,request_type,request_amound,send_type,send_amount,try_to_connect())
-        return HttpResponse( out )
+        return HttpResponse( funtion_make_traid(user,password,request_type,request_amound,send_type,send_amount,try_to_connect())  )
 
 
     return HttpResponse( mysting )

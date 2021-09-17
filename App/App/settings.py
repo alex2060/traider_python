@@ -97,16 +97,7 @@ CELERY = {
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'database',
-        'USER': 'user',
-        'PASSWORD': 'password',       
-        'HOST': 'database', # <-- docker host name for db
-        'PORT': '3306', # <-- docker port for db
-    }
-}
+
 
 
 # Password validation
